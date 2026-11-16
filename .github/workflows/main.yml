@@ -1,0 +1,50 @@
+
+name: Build realistic HumanForge avatar
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-human:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout HumanForge
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download MPFB2 data
+        run: |
+          git clone --depth 1 --filter=blob:none --sparse https://github.com/makehumancommunity/mpfb2.git mpfb2
+          git -C mpfb2 sparse-checkout set src/mpfb/data
+
+      - name: Download MakeHuman assets
+        run: |
+          curl -fL https://files2.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip -o makehuman_assets.zip
+          unzip -q makehuman_assets.zip -d mh_assets
+
+      - name: Build realistic human
+        run: |
+          npm run build:human -- mpfb2/src/mpfb/data mh_assets
+          npm run build:garments
+          test -f assets/human/manifest.json
+          du -sh assets/human
+
+      - name: Upload finished assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: humanforge-human-assets
+          path: assets/human/
+          if-no-files-found: error
+          retention-days: 7
